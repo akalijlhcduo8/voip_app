@@ -23,57 +23,23 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Verify main.dart exists
-        run: |
-          if [ ! -f "$GITHUB_WORKSPACE/lib/main.dart" ]; then
-            echo "❌ lib/main.dart not found in repo root!"
-            exit 1
-          fi
-
-      - name: Create Flutter project
-        run: flutter create --org com.voip --project-name my_app app_build
-
-      - name: Add dependencies
-        working-directory: app_build
-        run: flutter pub add flutter_webrtc web_socket_channel permission_handler
-
-      - name: Copy app code
-        run: cp "$GITHUB_WORKSPACE/lib/main.dart" "$GITHUB_WORKSPACE/app_build/lib/main.dart"
-
-      - name: Add Android permissions
-        working-directory: app_build
-        run: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          if ! grep -q "android.permission.RECORD_AUDIO" "$MANIFEST"; then
-            sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n\n    <application#' "$MANIFEST"
-          fi
-          cat "$MANIFEST"
-
-      - name: Set minSdk to 21
-        working-directory: app_build
-        run: |
-          if [ -f "android/app/build.gradle.kts" ]; then
-            sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/' android/app/build.gradle.kts
-          elif [ -f "android/app/build.gradle" ]; then
-            sed -i 's/minSdkVersion flutter\.minSdkVersion/minSdkVersion 21/' android/app/build.gradle
-            sed -i 's/minSdkVersion = flutter\.minSdkVersion/minSdkVersion = 21/' android/app/build.gradle
-          fi
-
-      - name: Get dependencies
-        working-directory: app_build
-        run: flutter pub get
-
       - name: Build APK
-        working-directory: app_build
-        run: flutter build apk --debug
-
-      - name: Prepare output
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/output"
-          cp app_build/build/app/outputs/flutter-apk/app-debug.apk "$GITHUB_WORKSPACE/output/"
+          # 1. إنشاء المشروع وتهيئته
+          flutter create . --platforms=android --project-name my_voip_app
+          
+          # 2. إضافة المكتبات
+          flutter pub add flutter_webrtc web_socket_channel permission_handler
+          
+          # 3. نسخ كود الشاشة
+          cp "$GITHUB_WORKSPACE/lib/main.dart" lib/main.dart
+          
+          # 4. بناء الـ APK مباشرة (دع Flutter يهتم بالإعدادات التلقائية)
+          flutter build apk --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
-          path: output/app-debug.apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          

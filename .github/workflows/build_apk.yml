@@ -23,6 +23,15 @@ jobs:
         with:
           channel: 'stable'
 
+      - name: Generate Android Skeleton & Permissions
+        run: |
+          flutter create . --project-name zangi_clone --org com.example --platforms=android
+          # إضافة أذونات الميكروفون والإنترنت لملف AndroidManifest
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n    <uses-permission android:name="android.permission.BLUETOOTH"/>\n    <uses-permission android:name="android.permission.CAMERA"/>' android/app/src/main/AndroidManifest.xml
+          # رفع الحد الأدنى لـ minSdkVersion إلى 21 لدعم WebRTC
+          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle || true
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle || true
+
       - name: Install dependencies
         run: flutter pub get
 

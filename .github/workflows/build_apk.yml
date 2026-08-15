@@ -23,18 +23,42 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Generate Android Skeleton & Permissions
+      - name: Setup & Build Android App
         run: |
-          flutter create . --project-name zangi_clone --org com.example --platforms=android
-          # إضافة أذونات الميكروفون والإنترنت لملف AndroidManifest
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n    <uses-permission android:name="android.permission.BLUETOOTH"/>\n    <uses-permission android:name="android.permission.CAMERA"/>' android/app/src/main/AndroidManifest.xml
-          # رفع الحد الأدنى لـ minSdkVersion إلى 21 لدعم WebRTC
-          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle || true
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle || true
+          # 1. إنشاء تطبيق نظيف
+          cd ..
+          flutter create --org com.voip --project-name app_voip build_project
+          cd build_project
 
-      - name: Install dependencies
-        run: flutter pub get
+          # 2. إضافة المكتبات المطلوبة مباشرة
+          flutter pub add flutter_webrtc
+          flutter pub add web_socket_channel
+          flutter pub add permission_handler
 
+          # 3. نسخ كود الشاشة والاتصال
+          cp "$GITHUB_WORKSPACE/lib/main.dart" lib/main.dart
+
+          # 4. إضافة الأذونات المطلوبة لملف AndroidManifest.xml
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n    <uses-permission android:name="android.permission.CAMERA"/>' android/app/src/main/AndroidManifest.xml
+
+          # 5. رفع minSdk إلى 21 لدعم WebRTC
+          find android -name "build.gradle*" -exec sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' {} +
+          find android -name "build.gradle*" -exec sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' {} +
+          find android -name "build.gradle*" -exec sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/g' {} +
+
+          # 6. بناء الـ APK
+          flutter build apk --release
+
+          # 7. نقل ملف الـ APK النهائي للمستودع للتحميل
+          mkdir -p "$GITHUB_WORKSPACE/output"
+          cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/output/"
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: output/app-release.apk
+          
       - name: Build APK
         run: flutter build apk --release
 

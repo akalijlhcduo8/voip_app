@@ -25,30 +25,34 @@ jobs:
 
       - name: Create and Build App
         run: |
-          # 1. إنشاء مشروع نظيف
-          rm -rf my_app
-          flutter create --org com.voip --project-name my_app my_app
-          cd my_app
+          # 1. إنشاء مشروع جديد
+          flutter create --org com.voip --project-name my_app app_build
+          cd app_build
 
           # 2. إضافة الحزم المطلوبة
           flutter pub add flutter_webrtc web_socket_channel permission_handler
 
-          # 3. نسخ كود التطبيق
+          # 3. نسخ كود الشاشة
           cp "$GITHUB_WORKSPACE/lib/main.dart" lib/main.dart
 
-          # 4. ضبط minSdk إلى 21 لدعم WebRTC
-          grep -rl "minSdk" android/ | xargs sed -i 's/minSdk = .*/minSdk = 21/g' 2>/dev/null || true
-          grep -rl "minSdkVersion" android/ | xargs sed -i 's/minSdkVersion .*/minSdkVersion 21/g' 2>/dev/null || true
+          # 4. إضافة أذونات الميكروفون والشبكة بشكل نظيف
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
 
-          # 5. إضافة أذونات الصوت والشبكة
-          sed -i '/<application/i <uses-permission android:name="android.permission.INTERNET"/>\n<uses-permission android:name="android.permission.RECORD_AUDIO"/>\n<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n<uses-permission android:name="android.permission.CAMERA"/>' android/app/src/main/AndroidManifest.xml
+          # 5. ضبط minSdk = 21 لتوافق WebRTC
+          if [ -f "android/app/build.gradle.kts" ]; then
+            sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/' android/app/build.gradle.kts
+          fi
+          if [ -f "android/app/build.gradle" ]; then
+            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/' android/app/build.gradle
+            sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/' android/app/build.gradle
+          fi
 
-          # 6. بناء ملف APK للتثبيت المباشر
+          # 6. بناء ملف APK
           flutter build apk --debug
 
-          # 7. نقل الملف الجاهز للتحميل
+          # 7. حفظ الملف للتحميل
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp build/app/outputs/flutter-apk/app-debug.apk "$GITHUB_WORKSPACE/output/app-debug.apk"
+          cp build/app/outputs/flutter-apk/app-debug.apk "$GITHUB_WORKSPACE/output/"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

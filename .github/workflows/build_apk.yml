@@ -23,40 +23,57 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Create and Build App
+      - name: Verify main.dart exists
         run: |
-          # 1. إنشاء مشروع جديد
-          flutter create --org com.voip --project-name my_app app_build
-          cd app_build
+          if [ ! -f "$GITHUB_WORKSPACE/lib/main.dart" ]; then
+            echo "❌ lib/main.dart not found in repo root!"
+            exit 1
+          fi
 
-          # 2. إضافة الحزم المطلوبة
-          flutter pub add flutter_webrtc web_socket_channel permission_handler
+      - name: Create Flutter project
+        run: flutter create --org com.voip --project-name my_app app_build
 
-          # 3. نسخ كود الشاشة
-          cp "$GITHUB_WORKSPACE/lib/main.dart" lib/main.dart
+      - name: Add dependencies
+        working-directory: app_build
+        run: flutter pub add flutter_webrtc web_socket_channel permission_handler
 
-          # 4. إضافة أذونات الميكروفون والشبكة بشكل نظيف
-          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
+      - name: Copy app code
+        run: cp "$GITHUB_WORKSPACE/lib/main.dart" "$GITHUB_WORKSPACE/app_build/lib/main.dart"
 
-          # 5. ضبط minSdk = 21 لتوافق WebRTC
+      - name: Add Android permissions
+        working-directory: app_build
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if ! grep -q "android.permission.RECORD_AUDIO" "$MANIFEST"; then
+            sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n\n    <application#' "$MANIFEST"
+          fi
+          cat "$MANIFEST"
+
+      - name: Set minSdk to 21
+        working-directory: app_build
+        run: |
           if [ -f "android/app/build.gradle.kts" ]; then
             sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/' android/app/build.gradle.kts
-          fi
-          if [ -f "android/app/build.gradle" ]; then
-            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/' android/app/build.gradle
-            sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/' android/app/build.gradle
+          elif [ -f "android/app/build.gradle" ]; then
+            sed -i 's/minSdkVersion flutter\.minSdkVersion/minSdkVersion 21/' android/app/build.gradle
+            sed -i 's/minSdkVersion = flutter\.minSdkVersion/minSdkVersion = 21/' android/app/build.gradle
           fi
 
-          # 6. بناء ملف APK
-          flutter build apk --debug
+      - name: Get dependencies
+        working-directory: app_build
+        run: flutter pub get
 
-          # 7. حفظ الملف للتحميل
+      - name: Build APK
+        working-directory: app_build
+        run: flutter build apk --debug
+
+      - name: Prepare output
+        run: |
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp build/app/outputs/flutter-apk/app-debug.apk "$GITHUB_WORKSPACE/output/"
+          cp app_build/build/app/outputs/flutter-apk/app-debug.apk "$GITHUB_WORKSPACE/output/"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
           path: output/app-debug.apk
-          

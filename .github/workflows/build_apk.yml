@@ -25,16 +25,13 @@ jobs:
 
       - name: Build APK
         run: |
-          # 1. إنشاء المشروع وتهيئته
-          flutter create . --platforms=android --project-name my_voip_app
+          # 1. إنشاء ملفات أندرويد الناقصة للمشروع
+          flutter create . --platforms=android --project-name voip_app
           
-          # 2. إضافة المكتبات
-          flutter pub add flutter_webrtc web_socket_channel permission_handler
-          
-          # 3. نسخ كود الشاشة
-          cp "$GITHUB_WORKSPACE/lib/main.dart" lib/main.dart
-          
-          # 4. بناء الـ APK مباشرة (دع Flutter يهتم بالإعدادات التلقائية)
+          # 2. تحديث الحزم
+          flutter pub get
+
+          # 3. بناء ملف APK مباشرة
           flutter build apk --debug
 
       - name: Upload APK
